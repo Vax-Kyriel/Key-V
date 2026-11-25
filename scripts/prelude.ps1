@@ -37,10 +37,52 @@ function Test-KeyVUsbDisk($disk) {
     return $false
 }
 
+function Test-SameDrive([string]$systemDrive, [string]$letter) {
+    if ([string]::IsNullOrWhiteSpace($systemDrive) -or [string]::IsNullOrWhiteSpace($letter)) { return $false }
+    $wanted = $systemDrive.TrimEnd('\').ToUpperInvariant()
+    $drive = $letter.Substring(0, 1).ToUpperInvariant() + ':'
+    return $drive -eq $wanted
+}
+
+function Test-RunningWindowsDisk($disk) {
+    $system = $env:SystemDrive
+    foreach ($part in @(Get-Partition -DiskNumber $disk.Number -ErrorAction SilentlyContinue)) {
+        if (Test-SameDrive $system ([string]$part.DriveLetter)) { return $true }
+    }
+    return $false
+}
+
+function Test-BootableMarkers([bool]$isBoot, [bool]$isSystem, [bool]$ventoy, [bool]$active, [string]$gptType, [string]$partType) {
+    if ($ventoy -or $isBoot -or $isSystem -or $active) { return $true }
+    if (-not [string]::IsNullOrWhiteSpace($gptType) -and $gptType.ToLowerInvariant().Contains('c12a7328-f81f-11d2-ba4b-00a0c93ec93b')) { return $true }
+    if ($partType -match '(?i)^(System|EFI)$') { return $true }
+    return $false
+}
+
+function Test-KeyVBootableDisk($disk, [bool]$ventoy) {
+    if ($ventoy) { return $true }
+    if ($null -eq $disk) { return $false }
+    $isBoot = $false
+    $isSystem = $false
+    try { $isBoot = [bool]$disk.IsBoot } catch { $isBoot = $false }
+    try { $isSystem = [bool]$disk.IsSystem } catch { $isSystem = $false }
+    if (Test-BootableMarkers $isBoot $isSystem $false $false '' '') { return $true }
+    foreach ($p in @(Get-Partition -DiskNumber $disk.Number -ErrorAction SilentlyContinue)) {
+        $active = $false
+        try { $active = [bool]$p.IsActive } catch { $active = $false }
+        $gpt = ''
+        try { $gpt = [string]$p.GptType } catch { $gpt = '' }
+        $type = ''
+        try { $type = [string]$p.Type } catch { $type = '' }
+        if (Test-BootableMarkers $false $false $false $active $gpt $type) { return $true }
+    }
+    return $false
+}
+
 function Assert-UsbDisk([int]$diskNumber) {
     $disk = Get-Disk -Number $diskNumber
     if (-not (Test-KeyVUsbDisk $disk)) { Fail 'NOT_USB' }
-    if ($disk.IsBoot -or $disk.IsSystem) { Fail 'IS_SYSTEM' }
+    if (Test-RunningWindowsDisk $disk) { Fail 'IS_SYSTEM' }
     return $disk
 }
 
@@ -66,35 +108,58 @@ function Invoke-Diskpart([string]$script) {
     }
 }
 
+function Remove-UsbMounts([int]$diskNumber) {
+    $parts = @(Get-Partition -DiskNumber $diskNumber -ErrorAction SilentlyContinue)
+    foreach ($part in $parts) {
+        foreach ($path in @($part.AccessPaths)) {
+            $text = [string]$path
+            if ($text -notmatch '^[A-Za-z]:\\$') { continue }
+            if (Test-SameDrive $env:SystemDrive $text.Substring(0, 1)) { continue }
+            try {
+                Remove-PartitionAccessPath -DiskNumber $diskNumber -PartitionNumber $part.PartitionNumber -AccessPath $text -ErrorAction Stop
+            } catch { }
+            & mountvol.exe ($text.TrimEnd('\')) /p | Out-Null
+        }
+    }
+}
+
 function Set-UsbOffline([int]$diskNumber) {
+    $current = Get-Disk -Number $diskNumber
+    if ($current.IsOffline) { return }
+    Remove-UsbMounts $diskNumber
     Dismount-UsbVolumes $diskNumber
-    $disk = Get-Disk -Number $diskNumber
-    if ($disk.IsReadOnly) {
+    if ($current.IsReadOnly) {
         try { Set-Disk -Number $diskNumber -IsReadOnly $false -ErrorAction Stop } catch { }
     }
-    Invoke-Diskpart ("select disk " + $diskNumber + "`r`nattributes disk clear readonly`r`noffline disk`r`n")
+    $script = "select disk " + $diskNumber + "`r`nattributes disk clear readonly`r`noffline disk`r`n"
+    Invoke-Diskpart $script
     $ready = $false
     $last = ''
-    for ($try = 0; $try -lt 6; $try++) {
+    for ($try = 0; $try -lt 8; $try++) {
         try {
             Set-Disk -Number $diskNumber -IsOffline $true -ErrorAction Stop
         } catch {
             $last = $_.Exception.Message
         }
-        Start-Sleep -Milliseconds 350
+        Start-Sleep -Milliseconds 300
         $again = Get-Disk -Number $diskNumber
         if ($again.IsOffline) {
             $ready = $true
             break
         }
+        Remove-UsbMounts $diskNumber
         Dismount-UsbVolumes $diskNumber
+        Invoke-Diskpart $script
     }
-    if (-not $ready) {
-        if ($last -match 'denied|refus') { Fail 'ACCESS_DENIED' }
-        if ($last -match 'in use|being used|utilis|autre processus|verrou') { Fail 'IN_USE' }
-        if ([string]::IsNullOrWhiteSpace($last)) { Fail 'IN_USE' }
-        Fail $last
+    if ($ready) { return }
+    if ($last -match 'denied|refus') { Fail 'ACCESS_DENIED' }
+    if ($last -match 'not supported|80070032|removable|amovible|prise en charge') {
+        Emit ('LOG' + $t + 'STILL_ONLINE')
+        return
     }
+    if ($last -match 'in use|being used|utilis|autre processus|verrou') { Fail 'IN_USE' }
+    if ([string]::IsNullOrWhiteSpace($last)) { Fail 'IN_USE' }
+    Fail $last
 }
 
 function Set-UsbOnline([int]$diskNumber) {

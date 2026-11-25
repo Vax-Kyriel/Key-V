@@ -12,6 +12,9 @@ final class Messages {
             case "OFFLINE" -> en
                     ? "The key goes offline. Explorer hides it while the VM is using it."
                     : "La clé passe hors ligne. Elle quitte l'Explorateur tant qu'elle est dans la VM.";
+            case "STILL_ONLINE" -> en
+                    ? "Windows left this bootable key online. Key-V still attaches it to the VM."
+                    : "Windows a laissé cette clé démarrable en ligne. Key-V la branche quand même sur la VM.";
             case "SB_OFF" -> en
                     ? "Secure Boot is off. Ventoy usually does not start with Hyper-V Secure Boot."
                     : "Secure Boot désactivé. Ventoy ne démarre en général pas avec le Secure Boot Hyper-V.";

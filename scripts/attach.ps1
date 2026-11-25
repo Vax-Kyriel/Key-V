@@ -55,7 +55,7 @@ function Set-Gen1BootDisk([string]$Name, [int]$Number) {
     }
 
     if ($slot00Kind -eq '') {
-        Add-VMHardDiskDrive -VMName $Name -ControllerType IDE -ControllerNumber 0 -ControllerLocation 0 -DiskNumber $Number
+        Add-KeyVPhysicalDisk $Name 'IDE' 0 0 $Number
         return
     }
 
@@ -70,7 +70,7 @@ function Set-Gen1BootDisk([string]$Name, [int]$Number) {
 
     Remove-VMHardDiskDrive -VMName $Name -ControllerType IDE -ControllerNumber 0 -ControllerLocation 0
     try {
-        Add-VMHardDiskDrive -VMName $Name -ControllerType IDE -ControllerNumber 0 -ControllerLocation 0 -DiskNumber $Number
+        Add-KeyVPhysicalDisk $Name 'IDE' 0 0 $Number
     } catch {
         try {
             Add-VMHardDiskDrive -VMName $Name -ControllerType IDE -ControllerNumber 0 -ControllerLocation 0 -Path $vhdPath
@@ -111,10 +111,22 @@ function Get-FreeScsiSlot([string]$Name) {
     return (Slot-Key ([int]$controllers[-1].ControllerNumber) 0)
 }
 
+function Add-KeyVPhysicalDisk([string]$Name, [string]$ControllerType, [int]$Controller, [int]$Location, [int]$Number) {
+    try {
+        Add-VMHardDiskDrive -VMName $Name -ControllerType $ControllerType -ControllerNumber $Controller -ControllerLocation $Location -DiskNumber $Number
+        return
+    } catch {
+        $detail = $_.Exception.Message
+        if ($detail -notmatch 'in use|being used|utilis|online|en ligne|verrou|not supported|80070032|removable|amovible|prise en charge') { throw }
+        Set-UsbOffline $Number
+        Add-VMHardDiskDrive -VMName $Name -ControllerType $ControllerType -ControllerNumber $Controller -ControllerLocation $Location -DiskNumber $Number
+    }
+}
+
 function Add-ScsiDisk([string]$Name, [int]$Number) {
     $slot = Get-FreeScsiSlot $Name
     $parts = $slot.Split(':')
-    Add-VMHardDiskDrive -VMName $Name -ControllerType SCSI -ControllerNumber ([int]$parts[0]) -ControllerLocation ([int]$parts[1]) -DiskNumber $Number
+    Add-KeyVPhysicalDisk $Name 'SCSI' ([int]$parts[0]) ([int]$parts[1]) $Number
     return $slot
 }
 

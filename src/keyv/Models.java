@@ -10,7 +10,11 @@ record UsbDisk(
         boolean ventoy,
         String labels,
         String letters,
-        String partitionStyle) {
+        String partitionStyle,
+        boolean bootable) {
+    boolean accepted() {
+        return ventoy || bootable;
+    }
 }
 
 record VirtualMachine(String name, String state, int generation, List<Integer> physicalDisks) {
