@@ -12,8 +12,12 @@ record UsbDisk(
         String letters,
         String partitionStyle,
         boolean bootable) {
+    boolean gpt() {
+        return partitionStyle != null && partitionStyle.equalsIgnoreCase("GPT");
+    }
+
     boolean accepted() {
-        return ventoy || bootable;
+        return ventoy || bootable || gpt();
     }
 }
 

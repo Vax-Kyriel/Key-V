@@ -109,7 +109,9 @@ final class Engine {
     private static UsbDisk parseDisk(String[] parts) {
         int number = Integer.parseInt(parts[1]);
         boolean ventoy = "true".equals(field(parts, 5));
-        boolean bootable = ventoy || "true".equals(field(parts, 9));
+        String style = field(parts, 8);
+        boolean gpt = "GPT".equalsIgnoreCase(style);
+        boolean bootable = ventoy || gpt || "true".equals(field(parts, 9));
         return new UsbDisk(
                 number,
                 field(parts, 2),
@@ -118,7 +120,7 @@ final class Engine {
                 ventoy,
                 field(parts, 6),
                 field(parts, 7),
-                field(parts, 8),
+                style,
                 bootable);
     }
 

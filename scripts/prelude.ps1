@@ -52,6 +52,10 @@ function Test-RunningWindowsDisk($disk) {
     return $false
 }
 
+function Test-GptStyle([string]$style) {
+    return $style -eq 'GPT'
+}
+
 function Test-BootableMarkers([bool]$isBoot, [bool]$isSystem, [bool]$ventoy, [bool]$active, [string]$gptType, [string]$partType) {
     if ($ventoy -or $isBoot -or $isSystem -or $active) { return $true }
     if (-not [string]::IsNullOrWhiteSpace($gptType) -and $gptType.ToLowerInvariant().Contains('c12a7328-f81f-11d2-ba4b-00a0c93ec93b')) { return $true }
@@ -62,6 +66,7 @@ function Test-BootableMarkers([bool]$isBoot, [bool]$isSystem, [bool]$ventoy, [bo
 function Test-KeyVBootableDisk($disk, [bool]$ventoy) {
     if ($ventoy) { return $true }
     if ($null -eq $disk) { return $false }
+    if (Test-GptStyle ([string]$disk.PartitionStyle)) { return $true }
     $isBoot = $false
     $isSystem = $false
     try { $isBoot = [bool]$disk.IsBoot } catch { $isBoot = $false }

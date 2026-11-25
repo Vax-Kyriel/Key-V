@@ -21,6 +21,12 @@ final class Messages {
             case "ATTACHED_SCSI" -> en
                     ? "Key attached as SCSI and set as the first boot device."
                     : "Clé attachée en SCSI et placée en premier démarrage.";
+            case "ATTACHED_GPT" -> en
+                    ? "GPT key attached as SCSI and set first. The generation 2 VM boots from it."
+                    : "Clé GPT branchée en SCSI et placée en premier. La VM génération 2 démarre dessus.";
+            case "ATTACHED_GPT_IDE" -> en
+                    ? "GPT key attached at IDE 0:0. The generation 1 VM boots from it."
+                    : "Clé GPT branchée en IDE 0:0. La VM génération 1 démarre dessus.";
             case "ATTACHED_IDE" -> en
                     ? "Key attached at IDE 0:0. A generation 1 VM boots from it."
                     : "Clé attachée en IDE 0:0. La VM génération 1 démarre dessus.";
@@ -115,8 +121,8 @@ final class Messages {
                     ? "No free IDE slot to keep the virtual disk and boot from the key."
                     : "Pas d'emplacement IDE libre pour garder le disque virtuel et démarrer sur la clé.";
             case "REMOVABLE" -> en
-                    ? "Hyper-V refused this key on IDE and on SCSI. Take it offline in Disk Management, then try again. A generation 2 VM also needs Ventoy installed as GPT."
-                    : "Hyper-V a refusé cette clé en IDE et en SCSI. Passe-la hors ligne dans la Gestion des disques, puis réessaie. Une VM génération 2 demande aussi Ventoy installé en GPT.";
+                    ? "Hyper-V refused this key on IDE and on SCSI. Take it offline in Disk Management, then try again."
+                    : "Hyper-V a refusé cette clé en IDE et en SCSI. Passe-la hors ligne dans la Gestion des disques, puis réessaie.";
             case "CHECKPOINTS" -> en
                     ? "This VM has checkpoints. Delete them in Hyper-V, then connect the key again."
                     : "Cette VM a des points de contrôle. Supprime-les dans Hyper-V, puis reconnecte la clé.";

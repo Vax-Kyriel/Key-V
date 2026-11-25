@@ -207,8 +207,8 @@ final class KeyVApp {
         frame.setVisible(true);
         applyLanguage();
         note(Lang.t(
-                "Choisis la clé démarrable, même en ligne, et une VM génération 1 ou 2. La clé devient le disque de démarrage.",
-                "Pick the bootable key, even while it is online, and a generation 1 or 2 VM. The key becomes the boot disk."));
+                "Choisis la clé GPT, même en ligne, et une VM génération 1 ou 2. La clé devient le disque de démarrage.",
+                "Pick the GPT key, even while it is online, and a generation 1 or 2 VM. The key becomes the boot disk."));
         refresh();
     }
 
@@ -227,8 +227,8 @@ final class KeyVApp {
 
     private void applyLanguage() {
         subtitle.setText(Lang.t(
-                "Branche une clé démarrable, même en ligne, sur une VM génération 1 ou 2.",
-                "Connects a bootable key, even while online, to a generation 1 or 2 VM."));
+                "Une clé GPT, même en ligne, se branche sur une VM génération 1 ou 2.",
+                "A GPT key, even while online, connects to a generation 1 or 2 VM."));
         diskTitle.setText(Lang.t("1. Clé branchée sur ce PC", "1. Key plugged into this PC"));
         diskHint.setText(Lang.t(
                 "Fais glisser la barre verte pour voir la clé choisie.",
@@ -534,7 +534,7 @@ final class KeyVApp {
     }
 
     private String diskLabel(UsbDisk disk) {
-        String kind = disk.ventoy() ? "Ventoy" : disk.bootable() ? Lang.t("Démarrable", "Bootable") : "USB";
+        String kind = disk.ventoy() ? "Ventoy" : disk.gpt() ? "GPT" : disk.bootable() ? Lang.t("Démarrable", "Bootable") : "USB";
         String letters = disk.letters().isBlank()
                 ? Lang.t("sans lettre de lecteur", "no drive letter")
                 : Lang.t("lecteur ", "drive ") + disk.letters() + ":";
@@ -598,8 +598,8 @@ final class KeyVApp {
                     "Key-V can see the keys, including online ones. Connecting one to the VM needs an administrator.");
         }
         return Lang.t(
-                "Choisis la clé démarrable, même en ligne, et la VM génération 1 ou 2 éteinte, puis connecte.",
-                "Choose the bootable key, even while it is online, and the generation 1 or 2 VM while it is off, then connect.");
+                "Choisis la clé GPT, même en ligne, et la VM génération 1 ou 2 éteinte, puis connecte.",
+                "Choose the GPT key, even while it is online, and the generation 1 or 2 VM while it is off, then connect.");
     }
 
     private void note(String line) {

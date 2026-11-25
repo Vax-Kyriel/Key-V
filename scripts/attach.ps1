@@ -146,34 +146,46 @@ function Set-Gen2BootFirst([string]$Name, [string]$slot) {
     $parts = $slot.Split(':')
     $controller = [int]$parts[0]
     $location = [int]$parts[1]
-    Start-Sleep -Milliseconds 400
-    $fresh = @(Get-VMHardDiskDrive -VMName $Name -ControllerType SCSI -ControllerNumber $controller -ControllerLocation $location) | Select-Object -First 1
+    $fresh = $null
+    for ($try = 0; $try -lt 6; $try++) {
+        Start-Sleep -Milliseconds 250
+        $fresh = @(Get-VMHardDiskDrive -VMName $Name -ControllerType SCSI -ControllerNumber $controller -ControllerLocation $location) | Select-Object -First 1
+        if ($null -ne $fresh) { break }
+    }
     if ($null -eq $fresh) { throw 'NOT_ADDED' }
-    $firmware = Get-VMFirmware -VMName $Name
-    $order = @($firmware.BootOrder)
-    $match = $null
-    foreach ($entry in $order) {
-        $device = $entry.Device
-        if ($null -eq $device) { continue }
-        if ($device.GetType().Name -notmatch 'HardDisk') { continue }
-        if ([int]$device.ControllerNumber -eq $controller -and [int]$device.ControllerLocation -eq $location) {
-            $match = $entry
-            break
-        }
-    }
-    if ($null -ne $match) {
-        $rest = New-Object System.Collections.Generic.List[object]
+    for ($try = 0; $try -lt 3; $try++) {
+        $firmware = Get-VMFirmware -VMName $Name
+        $order = @($firmware.BootOrder)
+        $match = $null
         foreach ($entry in $order) {
-            if (-not [object]::ReferenceEquals($entry, $match)) { [void]$rest.Add($entry) }
+            $device = $entry.Device
+            if ($null -eq $device) { continue }
+            if ($device.GetType().Name -notmatch 'HardDisk') { continue }
+            if ([int]$device.ControllerNumber -eq $controller -and [int]$device.ControllerLocation -eq $location) {
+                $match = $entry
+                break
+            }
         }
-        Set-VMFirmware -VMName $Name -BootOrder (@($match) + $rest.ToArray())
-        return
+        if ($null -ne $match) {
+            $rest = New-Object System.Collections.Generic.List[object]
+            foreach ($entry in $order) {
+                if (-not [object]::ReferenceEquals($entry, $match)) { [void]$rest.Add($entry) }
+            }
+            Set-VMFirmware -VMName $Name -BootOrder (@($match) + $rest.ToArray())
+            return
+        }
+        try {
+            Set-VMFirmware -VMName $Name -FirstBootDevice $fresh
+            return
+        } catch {
+            if ($try -ge 2) { throw }
+            Start-Sleep -Milliseconds 300
+        }
     }
-    Set-VMFirmware -VMName $Name -FirstBootDevice $fresh
 }
 
-function Disable-KeyVSecureBoot([string]$Name) {
-    if ($env:KEYV_DISABLE_SB -ne '1') { return }
+function Disable-KeyVSecureBoot([string]$Name, [bool]$force) {
+    if (-not $force -and $env:KEYV_DISABLE_SB -ne '1') { return }
     $fw = Get-VMFirmware -VMName $Name
     $sb = [string]$fw.SecureBoot
     $template = ([string]$fw.SecureBootTemplate).Replace([char]9, ' ')
@@ -217,20 +229,23 @@ try {
     $added = $false
     $addedSlot = $null
     try {
+        $gpt = Test-GptStyle ([string]$disk.PartitionStyle)
         if ([int]$vm.Generation -eq 2) {
-            if ([string]$disk.PartitionStyle -ne 'GPT') {
-                Emit ('LOG' + $t + 'MBR_GEN2')
-            }
-            Disable-KeyVSecureBoot $vmName
+            Disable-KeyVSecureBoot $vmName $gpt
             $addedSlot = Add-ScsiDisk $vmName $diskNumber
             $added = $true
             try {
                 Set-Gen2BootFirst $vmName $addedSlot
-                Emit ('LOG' + $t + 'ATTACHED_SCSI')
+                if ($gpt) {
+                    Emit ('LOG' + $t + 'ATTACHED_GPT')
+                } else {
+                    Emit ('LOG' + $t + 'MBR_GEN2')
+                    Emit ('LOG' + $t + 'ATTACHED_SCSI')
+                }
             } catch {
                 $detail = $_.Exception.Message.Replace([char]9, ' ').Replace([char]10, ' ').Replace([char]13, ' ')
                 Emit ('LOG' + $t + 'BOOT_SKIPPED' + $t + $detail)
-                Emit ('LOG' + $t + 'ATTACHED_SCSI')
+                if ($gpt) { Emit ('LOG' + $t + 'ATTACHED_GPT') } else { Emit ('LOG' + $t + 'ATTACHED_SCSI') }
             }
         } else {
             $onScsi = $false
@@ -254,7 +269,7 @@ try {
                     $detail = $_.Exception.Message.Replace([char]9, ' ').Replace([char]10, ' ').Replace([char]13, ' ')
                     Emit ('LOG' + $t + 'BIOS_KEPT' + $t + $detail)
                 }
-                Emit ('LOG' + $t + 'ATTACHED_IDE')
+                if ($gpt) { Emit ('LOG' + $t + 'ATTACHED_GPT_IDE') } else { Emit ('LOG' + $t + 'ATTACHED_IDE') }
             }
         }
     } catch {
