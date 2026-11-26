@@ -108,15 +108,20 @@ final class Engine {
 
     private static UsbDisk parseDisk(String[] parts) {
         int number = Integer.parseInt(parts[1]);
+        boolean ventoy = "true".equals(field(parts, 5));
+        String style = field(parts, 8);
+        boolean gpt = "GPT".equalsIgnoreCase(style);
+        boolean bootable = ventoy || gpt || "true".equals(field(parts, 9));
         return new UsbDisk(
                 number,
                 field(parts, 2),
                 field(parts, 3),
                 field(parts, 4),
-                "true".equals(field(parts, 5)),
+                ventoy,
                 field(parts, 6),
                 field(parts, 7),
-                field(parts, 8));
+                style,
+                bootable);
     }
 
     private static VirtualMachine parseVm(String[] parts) {

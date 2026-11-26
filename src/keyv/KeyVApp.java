@@ -207,8 +207,8 @@ final class KeyVApp {
         frame.setVisible(true);
         applyLanguage();
         note(Lang.t(
-                "Choisis la clé Ventoy et la VM, puis connecte. La clé devient le disque de démarrage.",
-                "Pick the Ventoy key and the VM, then connect. The key becomes the boot disk."));
+                "Choisis la clé GPT, même en ligne, et une VM génération 1 ou 2. La clé devient le disque de démarrage.",
+                "Pick the GPT key, even while it is online, and a generation 1 or 2 VM. The key becomes the boot disk."));
         refresh();
     }
 
@@ -227,8 +227,8 @@ final class KeyVApp {
 
     private void applyLanguage() {
         subtitle.setText(Lang.t(
-                "Intermédiaire entre une clé Ventoy et une VM Hyper-V.",
-                "Connects a Ventoy key to a Hyper-V virtual machine."));
+                "Une clé GPT, même en ligne, se branche sur une VM génération 1 ou 2.",
+                "A GPT key, even while online, connects to a generation 1 or 2 VM."));
         diskTitle.setText(Lang.t("1. Clé branchée sur ce PC", "1. Key plugged into this PC"));
         diskHint.setText(Lang.t(
                 "Fais glisser la barre verte pour voir la clé choisie.",
@@ -285,7 +285,7 @@ final class KeyVApp {
                     "Giving the key to Hyper-V requires administrator rights."));
             return;
         }
-        if (!disk.ventoy()) {
+        if (!disk.accepted()) {
             int answer = JOptionPane.showConfirmDialog(
                     null,
                     Lang.t(
@@ -419,11 +419,19 @@ final class KeyVApp {
         selectDisk(diskNumber);
         selectVm(vmName);
         if (disks.getSelectedIndex() < 0) {
+            int bootableIndex = -1;
             for (int i = 0; i < diskModel.size(); i++) {
                 if (diskModel.get(i).ventoy()) {
                     disks.setSelectedIndex(i);
+                    bootableIndex = -2;
                     break;
                 }
+                if (bootableIndex < 0 && diskModel.get(i).bootable()) {
+                    bootableIndex = i;
+                }
+            }
+            if (disks.getSelectedIndex() < 0 && bootableIndex >= 0) {
+                disks.setSelectedIndex(bootableIndex);
             }
             if (disks.getSelectedIndex() < 0 && !diskModel.isEmpty()) {
                 disks.setSelectedIndex(0);
@@ -437,12 +445,12 @@ final class KeyVApp {
             note(next.error());
         } else if (next.disks().isEmpty()) {
             note(Lang.t(
-                    "Aucune clé USB détectée. Branche la clé Ventoy, puis actualise.",
-                    "No USB key detected. Plug in the Ventoy key, then refresh."));
+                    "Aucune clé USB détectée. Branche la clé démarrable, puis actualise.",
+                    "No USB key detected. Plug in the bootable key, then refresh."));
         } else if ("ready".equals(next.hyperv()) && next.vms().isEmpty()) {
             note(Lang.t(
-                    "Hyper-V est prêt. Crée une VM génération 2, éteinte, puis reviens ici.",
-                    "Hyper-V is ready. Create a generation 2 VM, turn it off, then come back."));
+                    "Hyper-V est prêt. Crée une VM génération 1 ou 2, éteinte, puis reviens ici.",
+                    "Hyper-V is ready. Create a generation 1 or 2 VM, turn it off, then come back."));
         }
         updateButtons();
     }
@@ -526,7 +534,7 @@ final class KeyVApp {
     }
 
     private String diskLabel(UsbDisk disk) {
-        String kind = disk.ventoy() ? "Ventoy" : "USB";
+        String kind = disk.ventoy() ? "Ventoy" : disk.gpt() ? "GPT" : disk.bootable() ? Lang.t("Démarrable", "Bootable") : "USB";
         String letters = disk.letters().isBlank()
                 ? Lang.t("sans lettre de lecteur", "no drive letter")
                 : Lang.t("lecteur ", "drive ") + disk.letters() + ":";
@@ -586,12 +594,12 @@ final class KeyVApp {
         }
         if (!snapshot.admin()) {
             return Lang.t(
-                    "Key-V voit les clés. La connexion à la VM se fait en administrateur.",
-                    "Key-V can see the keys. Connecting one to the VM needs an administrator.");
+                    "Key-V voit les clés, y compris en ligne. La connexion à la VM se fait en administrateur.",
+                    "Key-V can see the keys, including online ones. Connecting one to the VM needs an administrator.");
         }
         return Lang.t(
-                "Choisis la clé Ventoy et la VM éteinte, puis connecte.",
-                "Choose the Ventoy key and the VM while it is off, then connect.");
+                "Choisis la clé GPT, même en ligne, et la VM génération 1 ou 2 éteinte, puis connecte.",
+                "Choose the GPT key, even while it is online, and the generation 1 or 2 VM while it is off, then connect.");
     }
 
     private void note(String line) {
@@ -685,7 +693,10 @@ final class KeyVApp {
             System.out.println("error=" + snapshot.error());
         }
         for (UsbDisk disk : snapshot.disks()) {
-            System.out.println("usb " + disk.number() + " " + disk.name() + " ventoy=" + disk.ventoy());
+            System.out.println("usb " + disk.number() + " " + disk.name()
+                    + " ventoy=" + disk.ventoy()
+                    + " bootable=" + disk.bootable()
+                    + " status=" + disk.status());
         }
         for (VirtualMachine vm : snapshot.vms()) {
             System.out.println("vm " + vm.name() + " " + vm.state() + " gen=" + vm.generation());

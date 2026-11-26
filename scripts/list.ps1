@@ -36,7 +36,8 @@ try {
         if ([string]::IsNullOrWhiteSpace($name)) { $name = 'Disque USB' }
         $name = $name.Replace([char]9, ' ').Replace([char]10, ' ').Replace([char]13, ' ')
         $style = [string]$disk.PartitionStyle
-        Emit ('USB' + $t + $disk.Number + $t + $size + $t + $name + $t + $status + $t + $ventoy.ToString().ToLower() + $t + ($labels -join ', ') + $t + ($letters -join ',') + $t + $style)
+        $bootable = Test-KeyVBootableDisk $disk $ventoy
+        Emit ('USB' + $t + $disk.Number + $t + $size + $t + $name + $t + $status + $t + $ventoy.ToString().ToLower() + $t + ($labels -join ', ') + $t + ($letters -join ',') + $t + $style + $t + $bootable.ToString().ToLower())
     }
 
     $vmms = Get-Service -Name vmms -ErrorAction SilentlyContinue
